@@ -17,16 +17,15 @@
 
 package org.jboss.aerogear.security.otp;
 
-import org.jboss.aerogear.security.otp.api.Base32;
+import java.io.UnsupportedEncodingException;
+import java.net.URLEncoder;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
 import org.jboss.aerogear.security.otp.api.Clock;
 import org.jboss.aerogear.security.otp.api.Digits;
 import org.jboss.aerogear.security.otp.api.Hash;
 import org.jboss.aerogear.security.otp.api.Hmac;
-
-import java.io.UnsupportedEncodingException;
-import java.net.URLEncoder;
-import java.security.InvalidKeyException;
-import java.security.NoSuchAlgorithmException;
 
 public class Totp {
 
@@ -95,18 +94,22 @@ public class Totp {
      *         Author: sweis@google.com (Steve Weis)
      */
     public boolean verify(String otp) {
-
-        long code = Long.parseLong(otp);
-        long currentInterval = clock.getCurrentInterval();
-
-        int pastResponse = Math.max(DELAY_WINDOW, 0);
-
-        for (int i = pastResponse; i >= 0; --i) {
-            int candidate = generate(this.secret, currentInterval - i);
-            if (candidate == code) {
-                return true;
-            }
-        }
+    	try {
+	        long code = Long.parseLong(otp);
+	        long currentInterval = clock.getCurrentInterval();
+	
+	        int pastResponse = Math.max(DELAY_WINDOW, 0);
+	
+	        for (int i = pastResponse; i >= 0; --i) {
+	            int candidate = generate(this.secret, currentInterval - i);
+	            if (candidate == code) {
+	                return true;
+	            }
+	        }
+    	}
+    	catch (NumberFormatException nfe) {
+    		Logger.getLogger(getClass().getName()).log(Level.WARNING, "invalid otp", nfe);
+    	}
         return false;
     }
 
@@ -118,13 +121,11 @@ public class Totp {
         byte[] hash = new byte[0];
         try {
             //Base32 encoding is just a requirement for google authenticator. We can remove it on the next releases.
-            hash = new Hmac(Hash.SHA1, Base32.decode(secret), interval).digest();
-        } catch (NoSuchAlgorithmException e) {
-            e.printStackTrace();
-        } catch (InvalidKeyException e) {
-            e.printStackTrace();
-        } catch (Base32.DecodingException e) {
-            e.printStackTrace();
+//            hash = new Hmac(Hash.SHA1, Base32.decode(secret), interval).digest();
+            hash = new Hmac(Hash.SHA1, secret.getBytes("UTF-8"), interval).digest();
+           
+        } catch (Exception e) {
+           throw new RuntimeException(e);
         }
         return bytesToInt(hash);
     }
